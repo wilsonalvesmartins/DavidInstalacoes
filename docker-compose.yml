@@ -12,6 +12,9 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    volumes:
+      # NOVO: Volume mapeado para armazenar os PDFs de contratos e aditivos fisicamente
+      - uploads-data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -37,3 +40,5 @@ services:
 volumes:
   pg-data:
     name: ${PROJECT_NAME:-portal_contratos}_pg_data
+  uploads-data:
+    name: ${PROJECT_NAME:-portal_contratos}_uploads
