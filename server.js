@@ -1,37 +1,44 @@
-const multer = require('multer');
-const fs = require('fs');
+version: '3.8'
 
-// Configura o destino dos uploads
-const upload = multer({ dest: 'uploads/' });
+services:
+  web:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    expose:
+      - "3000"
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    volumes:
+      # NOVO: Volume mapeado para armazenar os PDFs de contratos e aditivos fisicamente
+      - uploads-data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
 
-// Rota de Upload
-app.post('/api/upload', upload.single('file'), (req, res) => {
-  res.json({ fileName: req.file.filename, originalName: req.file.originalname });
-});
+  db:
+    image: postgres:15-alpine
+    restart: always
+    expose:
+      - "5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      # CRÍTICO: Volume nomeado para persistência de dados no Coolify
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-// Rota de Download (Baixar o arquivo real)
-app.get('/api/download/:fileName', (req, res) => {
-  const file = path.join(__dirname, 'uploads', req.params.fileName);
-  res.download(file);
-});
-
-**2. No Frontend (`App.jsx`):**
-A função de download precisará fazer uma requisição real para essa nova rota e forçar o navegador a baixar o documento.
-```javascript
-const handleDownload = async (fileName) => {
-  try {
-    const response = await fetch(`/api/download/${fileName}`);
-    const blob = await response.blob();
-    
-    // Cria um link temporário para forçar o download no navegador
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName; // Nome do arquivo que será salvo no PC
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  } catch (error) {
-    alert("Erro ao baixar o arquivo.");
-  }
-};
+volumes:
+  pg-data:
+    name: ${PROJECT_NAME:-portal_contratos}_pg_data
+  uploads-data:
+    name: ${PROJECT_NAME:-portal_contratos}_uploads
