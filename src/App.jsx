@@ -3,7 +3,7 @@ import {
   User, Lock, LogOut, LayoutDashboard, FileText, 
   Settings, Download, Eye, Paperclip, CheckCircle2, 
   Calendar, FilePlus, ChevronRight, UploadCloud,
-  Pencil, PlusCircle, X, Trash2
+  Pencil, PlusCircle, X, Trash2, Server, ServerOff
 } from 'lucide-react';
 
 const INITIAL_USER = {
@@ -11,6 +11,21 @@ const INITIAL_USER = {
   company: "DAVID C DA SILVA INSTALACOES",
   logo: "https://ui-avatars.com/api/?name=DS&background=0D8ABC&color=fff&size=128"
 };
+
+const INITIAL_CONTRACTS = [
+  {
+    id: "CTR-2024-0506",
+    providerName: "Claudir Nunes Ribeiro Junior",
+    cnpj: "54.718.709/0001-56",
+    service: "Instalação, ativação e configurações de internet (SCM)",
+    startDate: "2024-05-06",
+    endDate: "2026-05-06",
+    status: "Ativo",
+    value: "Variável (R$30 a R$150 por O.S)",
+    fileName: "Contrato_Claudir_Nunes.pdf",
+    addendums: []
+  }
+];
 
 // --- COMPONENTES ---
 
@@ -24,7 +39,7 @@ const LoginScreen = ({ onLogin, user }) => {
     if (username === 'administrador' && password === '12345678') {
       onLogin();
     } else {
-      setError('Usuário ou senha inválidos.');
+      setError('Utilizador ou senha inválidos.');
     }
   };
 
@@ -32,14 +47,14 @@ const LoginScreen = ({ onLogin, user }) => {
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100">
         <div className="flex flex-col items-center mb-8">
-          <img src={user.logo} alt="Logo da Empresa" className="w-24 h-24 rounded-full mb-4 shadow-sm" />
+          <img src={user.logo} alt="Logotipo da Empresa" className="w-24 h-24 rounded-full mb-4 shadow-sm" />
           <h1 className="text-2xl font-bold text-slate-800">Portal de Contratos</h1>
           <p className="text-slate-500 text-sm mt-1">{user.company}</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Usuário</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Utilizador</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <User className="h-5 w-5 text-slate-400" />
@@ -58,7 +73,7 @@ const LoginScreen = ({ onLogin, user }) => {
           </div>
           {error && <p className="text-red-500 text-sm text-center font-medium">{error}</p>}
           <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors shadow-md flex justify-center items-center">
-            Acessar Portal
+            Aceder ao Portal
           </button>
         </form>
       </div>
@@ -66,50 +81,34 @@ const LoginScreen = ({ onLogin, user }) => {
   );
 };
 
-const ContractDetailView = ({ contract, onBack, onEdit, onDelete, onUpdateContract }) => {
+const ContractDetailView = ({ contract, onBack, onEdit, onDelete, onAddAddendum, isDemoMode }) => {
   const [showAddendumForm, setShowAddendumForm] = useState(false);
   const [newAddendum, setNewAddendum] = useState({ title: '', description: '', date: '', file: null });
   const [isUploading, setIsUploading] = useState(false);
 
   const handleDownload = (fileName) => {
-    if(!fileName) return alert("Arquivo não disponível.");
-    // Download real acionando a API
-    window.open(`/api/download/${fileName}`, '_blank');
+    if(!fileName) return alert("Ficheiro não disponível.");
+    if (isDemoMode) {
+       alert(`[Modo Local] Simulação de download iniciada para: ${fileName}`);
+    } else {
+       window.open(`/api/download/${fileName}`, '_blank');
+    }
   };
 
   const handleSaveAddendum = async (e) => {
     e.preventDefault();
-    if (!newAddendum.file) return alert("Por favor, selecione o arquivo PDF do aditivo.");
+    if (!newAddendum.file) return alert("Por favor, selecione o ficheiro PDF do aditivo.");
     setIsUploading(true);
 
-    const formData = new FormData();
-    formData.append('addendumId', `ADT-${Math.floor(Math.random() * 10000)}`);
-    formData.append('title', newAddendum.title);
-    formData.append('date', newAddendum.date || new Date().toISOString().split('T')[0]);
-    formData.append('description', newAddendum.description);
-    formData.append('file', newAddendum.file);
-
-    try {
-      const response = await fetch(`/api/contratos/${contract.id}/aditivos`, {
-        method: 'POST',
-        body: formData,
-      });
-      const savedAddendum = await response.json();
-      
-      const updatedContract = { ...contract, addendums: [...(contract.addendums || []), savedAddendum] };
-      onUpdateContract(updatedContract);
-      
-      setShowAddendumForm(false);
-      setNewAddendum({ title: '', description: '', date: '', file: null });
-    } catch (err) {
-      alert("Erro ao salvar o aditivo.");
-    } finally {
-      setIsUploading(false);
-    }
+    await onAddAddendum(contract.id, newAddendum);
+    
+    setShowAddendumForm(false);
+    setNewAddendum({ title: '', description: '', date: '', file: null });
+    setIsUploading(false);
   };
 
   const handleDelete = () => {
-    if(window.confirm(`Tem certeza que deseja apagar o contrato de ${contract.providerName}? Esta ação não pode ser desfeita.`)) {
+    if(window.confirm(`Tem a certeza que deseja apagar o contrato de ${contract.providerName}? Esta ação não pode ser desfeita.`)) {
       onDelete(contract.id);
     }
   };
@@ -118,7 +117,7 @@ const ContractDetailView = ({ contract, onBack, onEdit, onDelete, onUpdateContra
     <div className="animate-fade-in max-w-5xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <button onClick={onBack} className="flex items-center text-blue-600 hover:text-blue-800 font-medium">
-          <ChevronRight className="h-5 w-5 rotate-180 mr-1" /> Voltar para Meus Contratos
+          <ChevronRight className="h-5 w-5 rotate-180 mr-1" /> Voltar aos Contratos
         </button>
         
         <div className="flex space-x-3">
@@ -224,13 +223,13 @@ const ContractDetailView = ({ contract, onBack, onEdit, onDelete, onUpdateContra
                       <input type="text" value={newAddendum.description} onChange={e => setNewAddendum({...newAddendum, description: e.target.value})} className="w-full rounded border-slate-300 py-2 px-3 text-sm" placeholder="Resumo do que foi alterado..." />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-xs font-medium text-slate-700 mb-1">Arquivo PDF</label>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Ficheiro PDF</label>
                       <input type="file" accept=".pdf" required onChange={e => setNewAddendum({...newAddendum, file: e.target.files[0]})} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
                     </div>
                   </div>
                   <div className="flex justify-end">
                     <button type="submit" disabled={isUploading} className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700 transition-colors">
-                      {isUploading ? 'A Enviar...' : 'Salvar Aditivo'}
+                      {isUploading ? 'A Enviar...' : 'Guardar Aditivo'}
                     </button>
                   </div>
                 </form>
@@ -238,7 +237,7 @@ const ContractDetailView = ({ contract, onBack, onEdit, onDelete, onUpdateContra
 
               <div className="space-y-3">
                 {(!contract.addendums || contract.addendums.length === 0) && !showAddendumForm && (
-                  <p className="text-sm text-slate-500 italic">Nenhum aditivo registrado.</p>
+                  <p className="text-sm text-slate-500 italic">Nenhum aditivo registado.</p>
                 )}
                 {contract.addendums?.map(addendum => (
                   <div key={addendum.id} className="border border-slate-200 rounded-lg p-4 flex justify-between items-center bg-white hover:border-slate-300 transition-colors">
@@ -277,35 +276,7 @@ const ContractForm = ({ initialData, onCancel, onSave }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-
-    if (isEditing) {
-      // Editar via JSON (não atualiza arquivo nesta versão simples)
-      try {
-        const response = await fetch(`/api/contratos/${formData.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
-        if(response.ok) onSave(formData, true);
-      } catch (err) { alert('Erro ao atualizar contrato'); }
-    } else {
-      // Criar Novo com Upload
-      const data = new FormData();
-      Object.keys(formData).forEach(key => data.append(key, formData[key]));
-      if (file) data.append('file', file);
-
-      try {
-        const response = await fetch('/api/contratos', { method: 'POST', body: data });
-        const savedContract = await response.json();
-        onSave({
-          ...savedContract,
-          providerName: savedContract.provider_name,
-          startDate: savedContract.start_date,
-          endDate: savedContract.end_date,
-          fileName: savedContract.file_name
-        }, false);
-      } catch (err) { alert('Erro ao registrar contrato'); }
-    }
+    await onSave(formData, file, isEditing);
     setIsSubmitting(false);
   };
 
@@ -313,7 +284,7 @@ const ContractForm = ({ initialData, onCancel, onSave }) => {
     <div className="animate-fade-in max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">{isEditing ? 'Editar Contrato' : 'Registrar Novo Contrato'}</h2>
+          <h2 className="text-2xl font-bold text-slate-800">{isEditing ? 'Editar Contrato' : 'Registar Novo Contrato'}</h2>
         </div>
         <button onClick={onCancel} className="text-slate-500 border border-slate-200 px-4 py-2 rounded-lg">Cancelar</button>
       </div>
@@ -354,13 +325,13 @@ const ContractForm = ({ initialData, onCancel, onSave }) => {
                 <input type="file" accept=".pdf" onChange={e => setFile(e.target.files[0])} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                 <div className="text-center">
                   <UploadCloud className={`mx-auto h-12 w-12 ${file ? 'text-blue-500' : 'text-slate-400'}`} />
-                  <span className="text-sm font-medium text-blue-600">{file ? file.name : 'Selecione um arquivo PDF'}</span>
+                  <span className="text-sm font-medium text-blue-600">{file ? file.name : 'Selecione um ficheiro PDF'}</span>
                 </div>
               </div>
             </div>
           )}
           <div className="flex justify-end pt-4">
-            <button type="submit" disabled={isSubmitting} className="bg-blue-600 text-white px-6 py-2.5 rounded-lg">{isSubmitting ? 'A guardar...' : 'Salvar Contrato'}</button>
+            <button type="submit" disabled={isSubmitting} className="bg-blue-600 text-white px-6 py-2.5 rounded-lg">{isSubmitting ? 'A guardar...' : 'Guardar Contrato'}</button>
           </div>
         </form>
       </div>
@@ -373,50 +344,137 @@ const DashboardApp = ({ user, onLogout }) => {
   const [contracts, setContracts] = useState([]);
   const [selectedContractId, setSelectedContractId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
-  // Busca dados do Backend real ao carregar a página
+  // Inicialização inteligente: Tenta ligar ao Backend. Se falhar, usa modo local (Canvas)
   useEffect(() => {
-    fetch('/api/contratos')
-      .then(res => res.json())
+    fetch('/api/contratos', { headers: { 'Accept': 'application/json' } })
+      .then(async res => {
+        const contentType = res.headers.get("content-type");
+        if (!res.ok || !contentType || !contentType.includes("application/json")) {
+          throw new Error("Backend não detetado ou retornou HTML");
+        }
+        return res.json();
+      })
       .then(data => {
         setContracts(data);
+        setIsDemoMode(false);
         setIsLoading(false);
       })
-      .catch(err => console.error("Erro ao buscar contratos:", err));
+      .catch(err => {
+        console.warn("Modo Local Ativado. O Backend PostgreSQL não está acessível a partir daqui.");
+        setContracts(INITIAL_CONTRACTS);
+        setIsDemoMode(true);
+        setIsLoading(false);
+      });
   }, []);
 
   const selectedContract = contracts.find(c => c.id === selectedContractId);
 
-  const handleSaveContract = (contractData, isEdit) => {
-    if (isEdit) {
-      setContracts(contracts.map(c => c.id === contractData.id ? { ...c, ...contractData } : c));
-      setActiveTab('details');
+  const handleSaveContract = async (formData, file, isEdit) => {
+    if (!isDemoMode) {
+       try {
+           if (isEdit) {
+               const res = await fetch(`/api/contratos/${formData.id}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(formData),
+               });
+               if(!res.ok) throw new Error("Erro de atualização");
+               setContracts(contracts.map(c => c.id === formData.id ? { ...c, ...formData } : c));
+           } else {
+               const data = new FormData();
+               Object.keys(formData).forEach(key => data.append(key, formData[key]));
+               if (file) data.append('file', file);
+               const res = await fetch('/api/contratos', { method: 'POST', body: data });
+               if(!res.ok) throw new Error("Erro de inserção");
+               const saved = await res.json();
+               const formatted = {
+                  ...saved,
+                  providerName: saved.provider_name,
+                  startDate: saved.start_date,
+                  endDate: saved.end_date,
+                  fileName: saved.file_name
+               };
+               setContracts([formatted, ...contracts]);
+           }
+       } catch (err) {
+           alert("Erro ao comunicar com o Banco de Dados.");
+           return;
+       }
     } else {
-      setContracts([contractData, ...contracts]);
-      setActiveTab('contracts');
+       // Comportamento em Modo Local (Canvas)
+       if (isEdit) {
+           setContracts(contracts.map(c => c.id === formData.id ? { ...c, ...formData } : c));
+       } else {
+           const newContract = { ...formData, fileName: file ? file.name : null, addendums: [] };
+           setContracts([newContract, ...contracts]);
+       }
     }
+    setActiveTab(isEdit ? 'details' : 'contracts');
   };
 
   const handleDeleteContract = async (id) => {
-    try {
-      await fetch(`/api/contratos/${id}`, { method: 'DELETE' });
-      setContracts(contracts.filter(c => c.id !== id));
-      setActiveTab('contracts');
-      setSelectedContractId(null);
-    } catch (err) {
-      alert("Erro ao excluir o contrato");
+    if (!isDemoMode) {
+       try {
+         await fetch(`/api/contratos/${id}`, { method: 'DELETE' });
+       } catch (err) {
+         return alert("Erro ao apagar contrato no servidor.");
+       }
     }
+    setContracts(contracts.filter(c => c.id !== id));
+    setActiveTab('contracts');
+    setSelectedContractId(null);
+  };
+
+  const handleAddAddendum = async (contractId, addendumData) => {
+    let savedAddendum = null;
+    if (!isDemoMode) {
+        try {
+            const formData = new FormData();
+            formData.append('addendumId', `ADT-${Math.floor(Math.random() * 10000)}`);
+            formData.append('title', addendumData.title);
+            formData.append('date', addendumData.date || new Date().toISOString().split('T')[0]);
+            formData.append('description', addendumData.description);
+            formData.append('file', addendumData.file);
+
+            const response = await fetch(`/api/contratos/${contractId}/aditivos`, {
+              method: 'POST',
+              body: formData,
+            });
+            if(!response.ok) throw new Error("Erro");
+            savedAddendum = await response.json();
+        } catch(err) {
+            alert("Erro ao gravar aditivo no servidor.");
+            return;
+        }
+    } else {
+        savedAddendum = {
+           id: `ADT-${Math.floor(Math.random() * 10000)}`,
+           title: addendumData.title,
+           date: addendumData.date || new Date().toISOString().split('T')[0],
+           description: addendumData.description,
+           fileName: addendumData.file.name
+        };
+    }
+
+    setContracts(contracts.map(c => {
+        if (c.id === contractId) {
+            return { ...c, addendums: [...(c.addendums || []), savedAddendum] };
+        }
+        return c;
+    }));
   };
 
   const renderContent = () => {
-    if (isLoading) return <div className="text-center mt-20 text-slate-500">A carregar informações da Base de Dados...</div>;
+    if (isLoading) return <div className="text-center mt-20 text-slate-500">A verificar ligação à Base de Dados...</div>;
 
     if (activeTab === 'new' || activeTab === 'edit') {
       return <ContractForm initialData={activeTab === 'edit' ? selectedContract : null} onCancel={() => activeTab === 'edit' ? setActiveTab('details') : setActiveTab('contracts')} onSave={handleSaveContract} />;
     }
 
     if (activeTab === 'details' && selectedContract) {
-      return <ContractDetailView contract={selectedContract} onBack={() => {setSelectedContractId(null); setActiveTab('contracts');}} onEdit={() => setActiveTab('edit')} onDelete={handleDeleteContract} onUpdateContract={(updated) => setContracts(contracts.map(c => c.id === updated.id ? updated : c))} />;
+      return <ContractDetailView contract={selectedContract} isDemoMode={isDemoMode} onBack={() => {setSelectedContractId(null); setActiveTab('contracts');}} onEdit={() => setActiveTab('edit')} onDelete={handleDeleteContract} onAddAddendum={handleAddAddendum} />;
     }
 
     if (activeTab === 'contracts') {
@@ -484,6 +542,17 @@ const DashboardApp = ({ user, onLogout }) => {
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white h-20 border-b px-8 flex items-center justify-between">
           <h1 className="text-xl">Olá, <span className="font-bold">{user.name.split(' ')[0]}</span></h1>
+          <div className="flex items-center space-x-3 mr-6">
+             {isDemoMode ? (
+                <span className="flex items-center text-xs font-medium text-yellow-700 bg-yellow-100 px-3 py-1.5 rounded-full border border-yellow-200 shadow-sm" title="Os dados não são guardados de forma permanente no Canvas.">
+                  <ServerOff className="w-4 h-4 mr-1.5" /> Modo Local (S/ Base de Dados)
+                </span>
+             ) : (
+                <span className="flex items-center text-xs font-medium text-green-700 bg-green-100 px-3 py-1.5 rounded-full border border-green-200 shadow-sm">
+                  <Server className="w-4 h-4 mr-1.5" /> Servidor Conectado
+                </span>
+             )}
+          </div>
         </header>
         <div className="flex-1 overflow-auto p-8">{renderContent()}</div>
       </main>
