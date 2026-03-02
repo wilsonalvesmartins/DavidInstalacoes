@@ -3,7 +3,8 @@ import {
   User, Lock, LogOut, LayoutDashboard, FileText, 
   Settings, Download, Eye, Paperclip, CheckCircle2, 
   Calendar, FilePlus, ChevronRight, UploadCloud,
-  Pencil, PlusCircle, X, Trash2, Server, ServerOff
+  Pencil, PlusCircle, X, Trash2, Server, ServerOff,
+  AlertCircle, Clock
 } from 'lucide-react';
 
 const INITIAL_USER = {
@@ -340,7 +341,7 @@ const ContractForm = ({ initialData, onCancel, onSave }) => {
 };
 
 const DashboardApp = ({ user, onLogout }) => {
-  const [activeTab, setActiveTab] = useState('contracts');
+  const [activeTab, setActiveTab] = useState('overview'); // Inicia na Agenda (Visão Geral)
   const [contracts, setContracts] = useState([]);
   const [selectedContractId, setSelectedContractId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -403,7 +404,6 @@ const DashboardApp = ({ user, onLogout }) => {
            return;
        }
     } else {
-       // Comportamento em Modo Local (Canvas)
        if (isEdit) {
            setContracts(contracts.map(c => c.id === formData.id ? { ...c, ...formData } : c));
        } else {
@@ -469,6 +469,107 @@ const DashboardApp = ({ user, onLogout }) => {
   const renderContent = () => {
     if (isLoading) return <div className="text-center mt-20 text-slate-500">A verificar ligação à Base de Dados...</div>;
 
+    if (activeTab === 'overview') {
+      // Lógica de Vencimentos
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const expiringContracts = contracts
+        .filter(c => c.endDate)
+        .map(c => {
+           const end = new Date(c.endDate);
+           const diffTime = end - today;
+           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+           return { ...c, diffDays };
+        })
+        .sort((a, b) => a.diffDays - b.diffDays);
+
+      const expired = expiringContracts.filter(c => c.diffDays < 0);
+      const expiringSoon = expiringContracts.filter(c => c.diffDays >= 0 && c.diffDays <= 45);
+
+      return (
+        <div className="animate-fade-in space-y-6">
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-slate-800">Agenda de Vencimentos</h2>
+            <p className="text-slate-500 mt-1">Acompanhe os prazos e renovações dos seus contratos ativos.</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center">
+              <div className="p-4 bg-blue-100 rounded-lg text-blue-600 mr-4">
+                <FileText className="w-8 h-8" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-500">Total de Contratos</p>
+                <p className="text-3xl font-bold text-slate-800">{contracts.length}</p>
+              </div>
+            </div>
+            
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center">
+              <div className="p-4 bg-yellow-100 rounded-lg text-yellow-600 mr-4">
+                <Clock className="w-8 h-8" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-500">A Vencer (45 dias)</p>
+                <p className="text-3xl font-bold text-slate-800">{expiringSoon.length}</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center">
+              <div className="p-4 bg-red-100 rounded-lg text-red-600 mr-4">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-500">Vencidos</p>
+                <p className="text-3xl font-bold text-slate-800">{expired.length}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Lista de Próximos Vencimentos */}
+          <div className="mt-8 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+             <div className="p-6 border-b border-slate-200 bg-slate-50">
+               <h3 className="text-lg font-bold text-slate-800 flex items-center"><Calendar className="w-5 h-5 mr-2 text-blue-600" /> Próximos Vencimentos</h3>
+             </div>
+             <table className="min-w-full divide-y divide-slate-200">
+               <thead className="bg-white">
+                 <tr>
+                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Prestador</th>
+                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Data de Vencimento</th>
+                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Situação</th>
+                   <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase">Ações</th>
+                 </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-100">
+                 {expiringContracts.length === 0 ? (
+                   <tr><td colSpan="4" className="px-6 py-10 text-center text-slate-500">Sem datas de vencimento registadas.</td></tr>
+                 ) : (
+                   expiringContracts.slice(0, 10).map(item => (
+                     <tr key={item.id} className="hover:bg-slate-50">
+                       <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-900">{item.providerName}</td>
+                       <td className="px-6 py-4 whitespace-nowrap text-sm">{item.endDate.split('-').reverse().join('/')}</td>
+                       <td className="px-6 py-4 whitespace-nowrap">
+                          {item.diffDays < 0 ? (
+                            <span className="px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Vencido há {Math.abs(item.diffDays)} dias</span>
+                          ) : item.diffDays <= 45 ? (
+                            <span className="px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Vence em {item.diffDays} dias</span>
+                          ) : (
+                            <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">No Prazo</span>
+                          )}
+                       </td>
+                       <td className="px-6 py-4 whitespace-nowrap text-right">
+                         <button onClick={() => {setSelectedContractId(item.id); setActiveTab('details');}} className="text-blue-600 hover:text-blue-900 font-medium text-sm">Visualizar</button>
+                       </td>
+                     </tr>
+                   ))
+                 )}
+               </tbody>
+             </table>
+          </div>
+        </div>
+      );
+    }
+
     if (activeTab === 'new' || activeTab === 'edit') {
       return <ContractForm initialData={activeTab === 'edit' ? selectedContract : null} onCancel={() => activeTab === 'edit' ? setActiveTab('details') : setActiveTab('contracts')} onSave={handleSaveContract} />;
     }
@@ -505,7 +606,10 @@ const DashboardApp = ({ user, onLogout }) => {
                         <div className="text-sm text-slate-500">{item.id}</div>
                       </td>
                       <td className="px-6 py-4"><div className="text-sm truncate w-48">{item.service}</div></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">{item.startDate?.split('-').reverse().join('/')}</td>
+                      {/* ALTERAÇÃO SOLICITADA: Mostra apenas a data de término na coluna vigência */}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-700">
+                        {item.endDate ? item.endDate.split('-').reverse().join('/') : 'Indeterminado'}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <button onClick={() => {setSelectedContractId(item.id); setActiveTab('details');}} className="text-blue-600 hover:text-blue-900 font-medium">Visualizar</button>
                       </td>
@@ -529,7 +633,10 @@ const DashboardApp = ({ user, onLogout }) => {
           <h2 className="font-bold text-white text-center text-sm">{user.company}</h2>
         </div>
         <nav className="flex-1 py-6 px-4 space-y-2">
-          <button onClick={() => {setActiveTab('contracts'); setSelectedContractId(null);}} className={`w-full flex items-center px-4 py-3 text-sm rounded-lg ${activeTab !== 'overview' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800'}`}>
+          <button onClick={() => {setActiveTab('overview'); setSelectedContractId(null);}} className={`w-full flex items-center px-4 py-3 text-sm rounded-lg ${activeTab === 'overview' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800'}`}>
+            <LayoutDashboard className="w-5 h-5 mr-3" /> Agenda
+          </button>
+          <button onClick={() => {setActiveTab('contracts'); setSelectedContractId(null);}} className={`w-full flex items-center px-4 py-3 text-sm rounded-lg ${['contracts', 'new', 'edit', 'details'].includes(activeTab) ? 'bg-blue-600 text-white' : 'hover:bg-slate-800'}`}>
             <FileText className="w-5 h-5 mr-3" /> Contratos
           </button>
         </nav>
